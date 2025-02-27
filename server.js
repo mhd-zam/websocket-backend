@@ -1,8 +1,8 @@
 // server.js
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
@@ -10,9 +10,9 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: '*',
-        methods: ["GET", "POST"]
-    }
+        origin: "*",
+        methods: ["GET", "POST"],
+    },
 });
 
 // In-memory store for our board state
@@ -47,35 +47,59 @@ let boardState = [
     },
 ];
 
-// WebSocket event handlers
-io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+const user = [];
 
+// WebSocket event handlers
+io.on("connection", (socket) => {
     // Send initial board state when requested
-    socket.on('requestInitialState', () => {
-        socket.emit('initialState', boardState);
+    socket.on("login", (userCredential) => {
+        let index = user.findIndex(
+            (details) => details.email == userCredential.email
+        );
+        if (index == -1) {
+            user.push({ ...userCredential, online: true });
+        }
+        socket.broadcast.emit("userlist", user);
     });
 
+    socket.off("offline", (offlineuser) => {
+        let findIndex = user.findIndex(
+            (data) => data.user.email == offlineuser.email
+        );
+        user[findIndex] = {
+            ...user[findIndex],
+            online: false,
+        };
+    });
+
+    socket.on("requestInitialState", () => {
+        socket.emit("initialState", boardState);
+    });
+
+    // socket.on("requestUser", () => {
+    //     socket.emit("userlist", user);
+    // });
+
     // Handle board updates from clients
-    socket.on('updateBoard', (updatedCards) => {
+    socket.on("updateBoard", (updatedCards) => {
         // Update our in-memory state
         boardState = updatedCards;
 
         // Broadcast the update to all other connected clients
-        socket.broadcast.emit('boardUpdate', boardState);
+        socket.broadcast.emit("boardUpdate", boardState);
     });
 
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+    socket.on("disconnect", () => {
+        console.log("User disconnected:", socket.id);
     });
 });
 
 // Listen for HTTP requests too (optional)
-app.get('/', (req, res) => {
-    res.send('Kanban WebSocket server is running');
+app.get("/", (req, res) => {
+    res.send("Kanban WebSocket server is running");
 });
 
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
